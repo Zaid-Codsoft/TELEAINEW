@@ -1,0 +1,25 @@
+# Caddyfile for BrainCX Voice SaaS
+# Reverse proxy configuration (optional for production)
+
+{
+    # Disable automatic HTTPS for local development
+    auto_https off
+}
+
+:80 {
+    # Frontend
+    handle /* {
+        reverse_proxy web:80
+    }
+
+    # API
+    handle /api/* {
+        reverse_proxy api:8000
+    }
+
+    # Health check
+    handle /health {
+        reverse_proxy api:8000
+    }
+}
+
