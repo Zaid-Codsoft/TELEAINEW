@@ -1,10 +1,8 @@
-fastapi[standard]==0.115.0
-uvicorn[standard]==0.32.0
-sqlalchemy==2.0.36
-psycopg2-binary==2.9.10
-livekit==0.16.3
-livekit-api==0.8.3
-python-dotenv==1.0.1
-openai==1.55.3
-python-multipart==0.0.20
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary
+python-dotenv
+pyjwt
+pydantic
 

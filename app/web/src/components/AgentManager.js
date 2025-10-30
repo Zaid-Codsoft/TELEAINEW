@@ -13,10 +13,6 @@ function AgentManager() {
   const [formData, setFormData] = useState({
     name: '',
     system_prompt: '',
-    llm_model: 'gpt-4o-mini',
-    temperature: 0.7,
-    locale: 'en-US',
-    elevenlabs_voice_id: '21m00Tcm4TlvDq8ikWAM',
   });
 
   useEffect(() => {
@@ -57,10 +53,6 @@ function AgentManager() {
     setFormData({
       name: agent.name,
       system_prompt: agent.system_prompt,
-      llm_model: agent.llm_model,
-      temperature: agent.temperature,
-      locale: agent.locale,
-      elevenlabs_voice_id: agent.elevenlabs_voice_id,
     });
     setShowForm(true);
   };
@@ -82,10 +74,6 @@ function AgentManager() {
     setFormData({
       name: '',
       system_prompt: '',
-      llm_model: 'gpt-4o-mini',
-      temperature: 0.7,
-      locale: 'en-US',
-      elevenlabs_voice_id: '21m00Tcm4TlvDq8ikWAM',
     });
   };
 
@@ -135,59 +123,10 @@ function AgentManager() {
                 placeholder="You are a helpful assistant that..."
               />
               <small style={{ color: '#6b7280' }}>
-                This defines how your agent behaves and responds to users
+                This defines how your agent behaves and responds to users. The agent uses Gemini LLM, Whisper tiny for speech recognition, and SpeechT5 for text-to-speech.
               </small>
             </div>
 
-            <div className="form-group">
-              <label>LLM Model</label>
-              <select
-                value={formData.llm_model}
-                onChange={(e) => setFormData({ ...formData, llm_model: e.target.value })}
-              >
-                <option value="gpt-4o">GPT-4o (Most capable)</option>
-                <option value="gpt-4o-mini">GPT-4o Mini (Faster, cheaper)</option>
-                <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Budget)</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Temperature ({formData.temperature})</label>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.1"
-                value={formData.temperature}
-                onChange={(e) => setFormData({ ...formData, temperature: parseFloat(e.target.value) })}
-              />
-              <small style={{ color: '#6b7280' }}>
-                Higher = more creative, Lower = more focused
-              </small>
-            </div>
-
-            <div className="form-group">
-              <label>Locale</label>
-              <input
-                type="text"
-                value={formData.locale}
-                onChange={(e) => setFormData({ ...formData, locale: e.target.value })}
-                placeholder="en-US"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>ElevenLabs Voice ID</label>
-              <input
-                type="text"
-                value={formData.elevenlabs_voice_id}
-                onChange={(e) => setFormData({ ...formData, elevenlabs_voice_id: e.target.value })}
-                placeholder="21m00Tcm4TlvDq8ikWAM"
-              />
-              <small style={{ color: '#6b7280' }}>
-                Find voice IDs at elevenlabs.io/voice-library
-              </small>
-            </div>
 
             <div style={{ display: 'flex', gap: '1rem' }}>
               <button type="submit" className="btn btn-primary">

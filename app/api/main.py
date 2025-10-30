@@ -13,15 +13,22 @@ from datetime import datetime
 import os
 import uuid
 import secrets
+import traceback
 
 from dotenv import load_dotenv
 load_dotenv('.env.local')
 
-# LiveKit imports
-from livekit import api as livekit_api
+# JWT for token generation
+try:
+    import jwt
+    import time
+    PYJWT_AVAILABLE = True
+except ImportError:
+    PYJWT_AVAILABLE = False
+    print("WARNING: PyJWT not installed. Install it with: pip install pyjwt")
 
 # Local imports
-from database import get_db
+from database import get_db, check_database_connection
 from models import Session as SessionModel, Agent, SessionStatus, ChannelType, Organization
 
 # Initialize FastAPI app
@@ -37,10 +44,13 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:3001",
-    ],
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+    ],  # Allow specific origins
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # LiveKit configuration
@@ -83,18 +93,15 @@ class LoginRequest(BaseModel):
 class AgentCreateRequest(BaseModel):
     name: str
     system_prompt: str
-    llm_model: str = "gpt-4o-mini"
-    temperature: float = 0.7
-    locale: str = "en-US"
-    elevenlabs_voice_id: str = "21m00Tcm4TlvDq8ikWAM"
 
 class AgentUpdateRequest(BaseModel):
     name: Optional[str] = None
     system_prompt: Optional[str] = None
     llm_model: Optional[str] = None
+    stt_model: Optional[str] = None
+    tts_model: Optional[str] = None
     temperature: Optional[float] = None
     locale: Optional[str] = None
-    elevenlabs_voice_id: Optional[str] = None
     is_active: Optional[bool] = None
 
 class AgentResponse(BaseModel):
@@ -102,9 +109,10 @@ class AgentResponse(BaseModel):
     name: str
     system_prompt: str
     llm_model: str
+    stt_model: str
+    tts_model: str
     temperature: float
     locale: str
-    elevenlabs_voice_id: str
     is_active: bool
     created_at: datetime
 
@@ -203,9 +211,10 @@ def list_agents(db: Session = Depends(get_db)):
             name=agent.name,
             system_prompt=agent.system_prompt,
             llm_model=agent.llm_model,
+            stt_model=agent.stt_model,
+            tts_model=agent.tts_model,
             temperature=agent.temperature,
             locale=agent.locale,
-            elevenlabs_voice_id=agent.elevenlabs_voice_id,
             is_active=agent.is_active,
             created_at=agent.created_at
         )
@@ -220,15 +229,19 @@ def create_agent(
     """Create a new agent"""
     org = get_org(db)
     
+    # Create agent with simplified fields (only name and system_prompt)
+    # All other fields use defaults from the model
     agent = Agent(
         id=uuid.uuid4(),
         org_id=org.id,
         name=request.name,
         system_prompt=request.system_prompt,
-        llm_model=request.llm_model,
-        temperature=request.temperature,
-        locale=request.locale,
-        elevenlabs_voice_id=request.elevenlabs_voice_id,
+        # All other fields use database defaults:
+        # llm_model="gemini-1.5-flash" (will be set via defaults)
+        # stt_model="tiny"
+        # tts_model="microsoft/speecht5_tts"
+        # temperature=0.7
+        # locale="en-US"
         is_active=True,
         created_at=datetime.utcnow()
     )
@@ -242,9 +255,10 @@ def create_agent(
         name=agent.name,
         system_prompt=agent.system_prompt,
         llm_model=agent.llm_model,
+        stt_model=agent.stt_model,
+        tts_model=agent.tts_model,
         temperature=agent.temperature,
         locale=agent.locale,
-        elevenlabs_voice_id=agent.elevenlabs_voice_id,
         is_active=agent.is_active,
         created_at=agent.created_at
     )
@@ -261,9 +275,10 @@ def get_agent(agent_id: str, db: Session = Depends(get_db)):
         name=agent.name,
         system_prompt=agent.system_prompt,
         llm_model=agent.llm_model,
+        stt_model=agent.stt_model,
+        tts_model=agent.tts_model,
         temperature=agent.temperature,
         locale=agent.locale,
-        elevenlabs_voice_id=agent.elevenlabs_voice_id,
         is_active=agent.is_active,
         created_at=agent.created_at
     )
@@ -286,12 +301,14 @@ def update_agent(
         agent.system_prompt = request.system_prompt
     if request.llm_model is not None:
         agent.llm_model = request.llm_model
+    if request.stt_model is not None:
+        agent.stt_model = request.stt_model
+    if request.tts_model is not None:
+        agent.tts_model = request.tts_model
     if request.temperature is not None:
         agent.temperature = request.temperature
     if request.locale is not None:
         agent.locale = request.locale
-    if request.elevenlabs_voice_id is not None:
-        agent.elevenlabs_voice_id = request.elevenlabs_voice_id
     if request.is_active is not None:
         agent.is_active = request.is_active
     
@@ -303,9 +320,10 @@ def update_agent(
         name=agent.name,
         system_prompt=agent.system_prompt,
         llm_model=agent.llm_model,
+        stt_model=agent.stt_model,
+        tts_model=agent.tts_model,
         temperature=agent.temperature,
         locale=agent.locale,
-        elevenlabs_voice_id=agent.elevenlabs_voice_id,
         is_active=agent.is_active,
         created_at=agent.created_at
     )
@@ -332,10 +350,28 @@ def create_session(
     db: Session = Depends(get_db)
 ):
     """Create a new voice session"""
-    org = get_org(db)
+    try:
+        org = get_org(db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting organization: {e}")
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error while getting organization: {str(e)}. Make sure to run migrate.py first."
+        )
     
     # Verify agent exists
-    agent = db.query(Agent).filter(Agent.id == uuid.UUID(request.agent_id)).first()
+    try:
+        agent = db.query(Agent).filter(Agent.id == uuid.UUID(request.agent_id)).first()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid agent_id format: {str(e)}")
+    except Exception as e:
+        print(f"❌ Error querying agent: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
     
@@ -343,18 +379,25 @@ def create_session(
     room_name = f"braincx-{uuid.uuid4()}"
     
     # Create session in database
-    session = SessionModel(
-        id=uuid.uuid4(),
-        org_id=org.id,
-        agent_id=agent.id,
-        room=room_name,
-        channel=ChannelType(request.channel),
-        status=SessionStatus.ACTIVE,
-        started_at=datetime.utcnow()
-    )
-    
-    db.add(session)
-    db.commit()
+    try:
+        session = SessionModel(
+            id=uuid.uuid4(),
+            org_id=org.id,
+            agent_id=agent.id,
+            room=room_name,
+            channel=ChannelType(request.channel),
+            status=SessionStatus.ACTIVE,
+            started_at=datetime.utcnow()
+        )
+        
+        db.add(session)
+        db.commit()
+        db.refresh(session)
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Error creating session: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to create session: {str(e)}")
     
     # Create LiveKit room and token
     if not all([LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]):
@@ -363,18 +406,36 @@ def create_session(
             detail="LiveKit not configured. Set LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET"
         )
     
-    lk_api = livekit_api.LiveKitAPI(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+    if not PYJWT_AVAILABLE:
+        raise HTTPException(
+            status_code=500,
+            detail="PyJWT required for token generation. Install with: pip install pyjwt"
+        )
     
-    # Generate access token for user
-    token = livekit_api.AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
-    token.with_identity(f"user-{uuid.uuid4()}")
-    token.with_name("User")
-    token.with_grants(livekit_api.VideoGrants(
-        room_join=True,
-        room=room_name,
-    ))
+    # Generate access token manually
+    import time
+    now = int(time.time())
+    user_id = f"user-{uuid.uuid4()}"
     
-    access_token = token.to_jwt()
+    token_data = {
+        "iss": LIVEKIT_API_KEY,
+        "sub": user_id,
+        "name": "User",
+        "exp": now + 3600,  # 1 hour expiry
+        "video": {
+            "room": room_name,
+            "roomJoin": True,
+            "canPublish": True,
+            "canSubscribe": True,
+        }
+    }
+    
+    try:
+        access_token = jwt.encode(token_data, LIVEKIT_API_SECRET, algorithm="HS256")
+    except Exception as e:
+        print(f"❌ Error generating token: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to generate token: {str(e)}")
     
     return CreateSessionResponse(
         session_id=str(session.id),
@@ -459,17 +520,32 @@ def generate_token(request: TokenRequest):
             detail="LiveKit not configured"
         )
     
-    token = livekit_api.AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
-    token.with_identity(request.identity)
-    token.with_name(request.identity)
-    token.with_grants(livekit_api.VideoGrants(
-        room_join=True,
-        room=request.room,
-    ))
+    if not PYJWT_AVAILABLE:
+        raise HTTPException(
+            status_code=500,
+            detail="PyJWT required for token generation"
+        )
+    
+    now = int(time.time())
+    
+    token_data = {
+        "iss": LIVEKIT_API_KEY,
+        "sub": request.identity,
+        "name": request.identity,
+        "exp": now + 3600,
+        "video": {
+            "room": request.room,
+            "roomJoin": True,
+            "canPublish": True,
+            "canSubscribe": True,
+        }
+    }
+    
+    access_token = jwt.encode(token_data, LIVEKIT_API_SECRET, algorithm="HS256")
     
     return TokenResponse(
         url=LIVEKIT_URL,
-        token=token.to_jwt()
+        token=access_token
     )
 
 # ============================================
@@ -478,12 +554,24 @@ def generate_token(request: TokenRequest):
 
 @app.on_event("startup")
 def startup_event():
-    """Print startup information"""
+    """Startup event - check database connection before accepting requests"""
     print("=" * 60)
     print("🚀 BrainCX Voice SaaS API - Starting...")
     print("=" * 60)
-    print(f"API Docs: http://localhost:8000/docs")
-    print(f"Health: http://localhost:8000/health")
+    
+    # Check database connection before starting server
+    try:
+        check_database_connection()
+    except Exception as e:
+        print("\n" + "=" * 60)
+        print("❌ Server startup ABORTED due to database connection failure")
+        print("=" * 60)
+        raise
+    
+    print("\n" + "=" * 60)
+    print("✅ All checks passed!")
+    print(f"📚 API Docs: http://localhost:8000/docs")
+    print(f"❤️  Health: http://localhost:8000/health")
     print("=" * 60)
 
 if __name__ == "__main__":

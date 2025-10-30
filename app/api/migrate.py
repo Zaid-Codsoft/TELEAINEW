@@ -34,16 +34,12 @@ def seed_data():
         db.add(org)
         db.flush()  # Get the org.id
         
-        # Create demo agent
+        # Create demo agent (simplified - only name and system_prompt required)
         agent = Agent(
             id=uuid.uuid4(),
             org_id=org.id,
             name="Demo Voice Assistant",
             system_prompt="You are a friendly and helpful voice assistant. You can help users with general questions and provide information. Always be polite, clear, and concise in your responses.",
-            llm_model="gpt-4o-mini",
-            temperature=0.7,
-            locale="en-US",
-            elevenlabs_voice_id="21m00Tcm4TlvDq8ikWAM",
             is_active=True,
             created_at=datetime.utcnow()
         )

@@ -1,30 +1,25 @@
 #!/usr/bin/env python3
 """
-BrainCX Voice Agent - Simplified Starter Kit Version
-Handles web-based voice calls with basic functionality
+BrainCX Voice Agent - Hugging Face Free Models Version
+Uses free open-source models from Hugging Face instead of paid APIs
 """
 from dotenv import load_dotenv
-import json
 import os
 import aiohttp
 from typing import Annotated
-from livekit import api
 from livekit.agents import function_tool, RunContext
 
 from livekit import agents
 from livekit.agents import AgentSession, Agent, RoomInputOptions
-from livekit.plugins import (
-    openai,
-    deepgram,
-    elevenlabs,
-    silero,
-)
+from livekit.plugins import silero
+
+# Import our custom implementations
+from hf_stt import WhisperSTT
+from gemini_llm import GeminiLLM
+from hf_tts import SpeechT5TTSPlugin
 
 # Load environment variables
 load_dotenv('.env.local')
-
-# API Configuration
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 # Agent configuration class
 class BrainCXAgent(Agent):
@@ -100,46 +95,27 @@ class BrainCXAgent(Agent):
             return f"I couldn't calculate that. Please provide a valid mathematical expression."
 
 
-async def get_agent_config(room_name: str) -> dict:
+def get_agent_config() -> dict:
     """
-    Fetch agent configuration from the API based on room name
+    Get simple agent configuration with small, fast-downloading models
     
-    Args:
-        room_name: LiveKit room name
-        
     Returns:
-        Dictionary with agent configuration
+        Dictionary with agent configuration using smallest models
     """
-    try:
-        # Try to get agent config from API
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"{API_BASE_URL}/agents") as response:
-                if response.status == 200:
-                    agents_list = await response.json()
-                    if agents_list:
-                        # Use the first active agent
-                        for agent in agents_list:
-                            if agent.get("is_active", True):
-                                print(f"✓ Loaded agent: {agent['name']}")
-                                return agent
-                        # If no active agent, use first one
-                        return agents_list[0]
-    except Exception as e:
-        print(f"⚠ Could not fetch agent config from API: {e}")
-    
-    # Fallback to default configuration
-    print("⚠ Using default agent configuration")
     return {
-        "name": "Demo Assistant",
+        "name": "Simple Voice Assistant",
         "system_prompt": (
             "You are a friendly and helpful voice assistant. "
             "You can help users with general questions, check the weather, "
-            "and perform calculations. Always be polite, clear, and concise."
+            "and perform calculations. Always be polite, clear, and concise. "
+            "Keep responses brief and conversational."
         ),
-        "llm_model": "gpt-4o-mini",
+        # Using Gemini for LLM, small models for STT/TTS
+        "llm_model": "gemini-1.5-flash",  # Fast and efficient Gemini model
+        "stt_model": "tiny",  # ~150MB - Smallest Whisper model
+        "tts_model": "microsoft/speecht5_tts",  # SpeechT5 - Python 3.13 compatible
         "temperature": 0.7,
         "locale": "en-US",
-        "elevenlabs_voice_id": "21m00Tcm4TlvDq8ikWAM"
     }
 
 
@@ -153,22 +129,29 @@ async def entrypoint(ctx: agents.JobContext):
     # Connect to the LiveKit room
     await ctx.connect()
     
-    # Get agent configuration
-    agent_config = await get_agent_config(ctx.room.name)
+    # Get agent configuration (simplified - no API calls)
+    agent_config = get_agent_config()
     
-    # Create agent session with plugins
+    # Create agent session with Gemini LLM and small STT/TTS models
     print("🔧 Initializing agent session...")
+    
+    # Extract locale for language code (e.g., "en-US" -> "en")
+    locale = agent_config["locale"]
+    language_code = locale.split("-")[0] if "-" in locale else locale
+    
     session = AgentSession(
-        stt=deepgram.STT(
-            model="nova-2",
-            language=agent_config.get("locale", "en-US")
+        stt=WhisperSTT(
+            model=agent_config["stt_model"],  # tiny - smallest and fastest to download
+            language=language_code,
         ),
-        llm=openai.LLM(
-            model=agent_config.get("llm_model", "gpt-4o-mini"),
-            temperature=agent_config.get("temperature", 0.7)
+        llm=GeminiLLM(
+            model=agent_config["llm_model"],  # Gemini - fast and high quality
+            api_key=os.getenv("GEMINI_API_KEY", "AIzaSyCFWCPXn92NwfoUOg4lNDG1t2Ex3MesMfQ"),
+            temperature=agent_config["temperature"],
+            max_tokens=1024,
         ),
-        tts=elevenlabs.TTS(
-            voice_id=agent_config.get("elevenlabs_voice_id", "21m00Tcm4TlvDq8ikWAM")
+        tts=SpeechT5TTSPlugin(
+            model="microsoft/speecht5_tts",  # SpeechT5 - Python 3.13 compatible
         ),
         vad=silero.VAD.load(),
     )
@@ -203,9 +186,9 @@ if __name__ == "__main__":
         python simple_agent.py start            # Production mode
     """
     print("=" * 60)
-    print("🚀 BrainCX Voice Agent - Starting...")
+    print("🚀 Simple Voice Agent - Starting...")
+    print("Using smallest models for fast downloads")
     print("=" * 60)
-    print(f"API URL: {API_BASE_URL}")
     print(f"LiveKit: {os.getenv('LIVEKIT_URL', 'Not configured')}")
     print("=" * 60)
     

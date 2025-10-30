@@ -47,10 +47,12 @@ class Agent(Base):
     org_id = Column(UUID(as_uuid=True), ForeignKey("orgs.id"))
     name = Column(String(255), nullable=False)
     system_prompt = Column(Text, nullable=False)
-    llm_model = Column(String(50), default="gpt-4o-mini")
+    # Model configurations (defaults match simple_agent.py)
+    llm_model = Column(String(255), default="gemini-1.5-flash")
+    stt_model = Column(String(50), default="tiny")  # Whisper model: tiny, base, small, medium, large
+    tts_model = Column(String(255), default="microsoft/speecht5_tts")
     temperature = Column(Float, default=0.7)
     locale = Column(String(10), default="en-US")
-    elevenlabs_voice_id = Column(String(255), default="21m00Tcm4TlvDq8ikWAM")
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 

@@ -54,7 +54,7 @@ function VoiceCall() {
     try {
       // Create session
       const sessionResponse = await apiClient.createSession(selectedAgentId, 'web');
-      const { session_id, room, url, token } = sessionResponse.data;
+      const { session_id, room: roomName, url, token } = sessionResponse.data;
       
       setSessionId(session_id);
 
