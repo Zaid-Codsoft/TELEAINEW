@@ -34,10 +34,10 @@ def migrate_agents():
             # Update to new defaults if they have old defaults
             updated = False
             
-            if agent.llm_model in ["mistralai/Mistral-7B-Instruct-v0.2", "gpt-4o-mini"]:
-                agent.llm_model = "gemini-1.5-flash"
+            if agent.llm_model in ["mistralai/Mistral-7B-Instruct-v0.2", "gpt-4o-mini", "gemini-1.5-flash"]:
+                agent.llm_model = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
                 updated = True
-                print(f"  ✓ Updated agent '{agent.name}': LLM model -> gemini-1.5-flash")
+                print(f"  ✓ Updated agent '{agent.name}': LLM model -> TinyLlama/TinyLlama-1.1B-Chat-v1.0")
             
             if agent.stt_model == "base":
                 agent.stt_model = "tiny"

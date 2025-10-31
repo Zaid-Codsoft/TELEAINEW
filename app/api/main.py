@@ -14,9 +14,18 @@ import os
 import uuid
 import secrets
 import traceback
+import asyncio
 
 from dotenv import load_dotenv
 load_dotenv('.env.local')
+
+# LiveKit SDK for agent dispatching
+try:
+    from livekit import api
+    LIVEKIT_API_AVAILABLE = True
+except ImportError:
+    LIVEKIT_API_AVAILABLE = False
+    print("WARNING: livekit-api not installed. Install with: pip install livekit-api")
 
 # JWT for token generation
 try:
@@ -237,7 +246,7 @@ def create_agent(
         name=request.name,
         system_prompt=request.system_prompt,
         # All other fields use database defaults:
-        # llm_model="gemini-1.5-flash" (will be set via defaults)
+        # llm_model="TinyLlama/TinyLlama-1.1B-Chat-v1.0" (will be set via defaults)
         # stt_model="tiny"
         # tts_model="microsoft/speecht5_tts"
         # temperature=0.7
@@ -345,7 +354,7 @@ def delete_agent(agent_id: str, db: Session = Depends(get_db)):
 # ============================================
 
 @app.post("/sessions", response_model=CreateSessionResponse)
-def create_session(
+async def create_session(
     request: CreateSessionRequest,
     db: Session = Depends(get_db)
 ):
@@ -436,6 +445,40 @@ def create_session(
         print(f"❌ Error generating token: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to generate token: {str(e)}")
+    
+    # Dispatch agent to the room
+    if LIVEKIT_API_AVAILABLE:
+        try:
+            print(f"📤 Dispatching agent to room: {room_name}")
+            livekit_api = api.LiveKitAPI(
+                url=LIVEKIT_URL,
+                api_key=LIVEKIT_API_KEY,
+                api_secret=LIVEKIT_API_SECRET
+            )
+            
+            # Create room with agent dispatch
+            await livekit_api.room.create_room(
+                api.CreateRoomRequest(
+                    name=room_name
+                )
+            )
+            print(f"✅ Room created: {room_name}")
+            
+            # Dispatch agent worker to the room
+            await livekit_api.agent_dispatch.create_dispatch(
+                api.CreateAgentDispatchRequest(
+                    room=room_name,
+                    agent_name="braincx-starter-agent"  # Must match the agent name in simple_agent.py
+                )
+            )
+            print(f"✅ Agent dispatched to room: {room_name}")
+            
+        except Exception as e:
+            print(f"⚠️  Warning: Could not dispatch agent: {e}")
+            # Don't fail the request if dispatch fails
+            traceback.print_exc()
+    else:
+        print("⚠️  LiveKit API not available - agent dispatch skipped")
     
     return CreateSessionResponse(
         session_id=str(session.id),

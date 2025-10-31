@@ -48,7 +48,7 @@ class Agent(Base):
     name = Column(String(255), nullable=False)
     system_prompt = Column(Text, nullable=False)
     # Model configurations (defaults match simple_agent.py)
-    llm_model = Column(String(255), default="gemini-1.5-flash")
+    llm_model = Column(String(255), default="TinyLlama/TinyLlama-1.1B-Chat-v1.0")  # Local Hugging Face model
     stt_model = Column(String(50), default="tiny")  # Whisper model: tiny, base, small, medium, large
     tts_model = Column(String(255), default="microsoft/speecht5_tts")
     temperature = Column(Float, default=0.7)

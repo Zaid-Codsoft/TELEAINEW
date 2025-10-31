@@ -5,7 +5,8 @@ Supports various open-source models like Llama, Mistral, Zephyr, etc.
 import asyncio
 from typing import AsyncIterator, Optional
 from livekit.agents import llm
-from livekit.agents.llm import ChatContext, ChatMessage, ChatRole
+from livekit.agents.llm import ChatContext, ChatMessage, ChatRole, ChoiceDelta
+import uuid
 import torch
 from transformers import (
     AutoTokenizer,
@@ -17,6 +18,57 @@ from transformers import (
 )
 import threading
 from queue import Queue
+
+
+class ChatContextManager:
+    """Wrapper to make chat() work as async context manager and async iterator"""
+    def __init__(self, iterator):
+        self._iterator = iterator
+        self._exhausted = False
+        self._error_yielded = False
+    
+    async def __aenter__(self):
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        # Cleanup if the iterator supports it
+        if hasattr(self._iterator, 'aclose'):
+            try:
+                await self._iterator.aclose()
+            except Exception:
+                pass
+        return False
+    
+    def __aiter__(self):
+        return self
+    
+    async def __anext__(self):
+        if self._exhausted:
+            raise StopAsyncIteration
+        
+        try:
+            return await self._iterator.__anext__()
+        except StopAsyncIteration:
+            self._exhausted = True
+            raise
+        except Exception as e:
+            # Catch any exceptions and handle gracefully
+            print(f"❌ Error in ChatContextManager.__anext__: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Yield error as a chunk instead of crashing
+            if not self._error_yielded:
+                self._error_yielded = True
+                self._exhausted = True
+                # Return error chunk - correct structure: ChatChunk(id=..., delta=ChoiceDelta(...))
+                return llm.ChatChunk(
+                    id=str(uuid.uuid4()),
+                    delta=ChoiceDelta(content=f"[Error: {str(e)}]")
+                )
+            else:
+                # Already yielded error, stop iteration
+                raise StopAsyncIteration
 
 class StopOnTokens(StoppingCriteria):
     """Stop generation when certain tokens are encountered"""
@@ -82,14 +134,21 @@ class HuggingFaceLLM(llm.LLM):
                     print(f"   Device: {self._device}, Quantization: {self._use_quantization}")
                     
                     # Load tokenizer
+                    # According to TinyLlama docs, tokenizer should support chat templates
                     self._tokenizer = AutoTokenizer.from_pretrained(
                         self._model_name,
                         trust_remote_code=True,
                     )
                     
-                    # Add padding token if not present
+                    # Add padding token if not present (required for generation)
                     if self._tokenizer.pad_token is None:
                         self._tokenizer.pad_token = self._tokenizer.eos_token
+                        self._tokenizer.pad_token_id = self._tokenizer.eos_token_id
+                    
+                    # Verify chat template availability
+                    if self._tokenizer.chat_template is None:
+                        print(f"   ⚠️  Warning: Model {self._model_name} does not have a chat template")
+                        print(f"   Using fallback formatting instead")
                     
                     # Configure quantization for GPU
                     quantization_config = None
@@ -118,23 +177,43 @@ class HuggingFaceLLM(llm.LLM):
     
     def _format_messages(self, ctx: ChatContext) -> str:
         """Format chat messages for the model"""
+        # Safety check: ensure tokenizer is loaded
+        if self._tokenizer is None:
+            raise RuntimeError("Tokenizer must be loaded before formatting messages")
+        
+        # Filter items to get only messages
+        messages = [item for item in ctx.items if item.type == "message"]
+        
         # Check if model supports chat template
         if self._tokenizer.chat_template is not None:
             # Use chat template
-            messages = []
-            for msg in ctx.messages:
+            formatted_messages = []
+            for msg in messages:
+                # Get text content from message (handles list of content items)
+                if hasattr(msg, 'text_content') and msg.text_content:
+                    content = msg.text_content
+                elif hasattr(msg, 'content'):
+                    # Handle content as list
+                    if isinstance(msg.content, list):
+                        content = " ".join([str(c) for c in msg.content if isinstance(c, str)])
+                    else:
+                        content = str(msg.content)
+                else:
+                    content = ""
+                
                 role_map = {
-                    ChatRole.USER: "user",
-                    ChatRole.ASSISTANT: "assistant",
-                    ChatRole.SYSTEM: "system",
+                    "user": "user",
+                    "assistant": "assistant",
+                    "system": "system",
+                    "developer": "system",
                 }
-                messages.append({
+                formatted_messages.append({
                     "role": role_map.get(msg.role, "user"),
-                    "content": msg.content,
+                    "content": content,
                 })
             
             formatted = self._tokenizer.apply_chat_template(
-                messages,
+                formatted_messages,
                 tokenize=False,
                 add_generation_prompt=True,
             )
@@ -142,82 +221,175 @@ class HuggingFaceLLM(llm.LLM):
         else:
             # Fallback formatting
             text = ""
-            for msg in ctx.messages:
-                if msg.role == ChatRole.SYSTEM:
-                    text += f"System: {msg.content}\n\n"
-                elif msg.role == ChatRole.USER:
-                    text += f"User: {msg.content}\n\n"
-                elif msg.role == ChatRole.ASSISTANT:
-                    text += f"Assistant: {msg.content}\n\n"
+            for msg in messages:
+                # Get text content from message
+                if hasattr(msg, 'text_content') and msg.text_content:
+                    content = msg.text_content
+                elif hasattr(msg, 'content'):
+                    if isinstance(msg.content, list):
+                        content = " ".join([str(c) for c in msg.content if isinstance(c, str)])
+                    else:
+                        content = str(msg.content)
+                else:
+                    content = ""
+                
+                if msg.role == "system" or msg.role == "developer":
+                    text += f"System: {content}\n\n"
+                elif msg.role == "user":
+                    text += f"User: {content}\n\n"
+                elif msg.role == "assistant":
+                    text += f"Assistant: {content}\n\n"
             
             text += "Assistant: "
             return text
     
-    async def chat(
+    async def _chat_impl(
         self,
-        ctx: ChatContext,
-        fnc_ctx: Optional[llm.FunctionContext] = None,
+        *,
+        chat_ctx: ChatContext,
+        conn_options: Optional[object] = None,
+        fnc_ctx: Optional[object] = None,
+        tools: Optional[list] = None,
+        tool_choice: Optional[str] = None,
+        **kwargs,
     ) -> AsyncIterator[llm.ChatChunk]:
-        """Generate chat response"""
-        await self._load_model()
-        
-        # Format messages
-        prompt = self._format_messages(ctx)
-        
-        # Tokenize
-        inputs = self._tokenizer(prompt, return_tensors="pt", truncation=True, max_length=2048)
-        inputs = {k: v.to(self._device) for k, v in inputs.items()}
-        
-        # Stop tokens
-        stop_token_ids = []
-        if self._tokenizer.eos_token_id:
-            stop_token_ids.append(self._tokenizer.eos_token_id)
-        if self._tokenizer.pad_token_id and self._tokenizer.pad_token_id != self._tokenizer.eos_token_id:
-            stop_token_ids.append(self._tokenizer.pad_token_id)
-        
-        stopping_criteria = StoppingCriteriaList([StopOnTokens(stop_token_ids)])
-        
-        # Generate
+        """Internal chat implementation that yields chunks"""
         try:
+            await self._load_model()
+            
+            # Ensure tokenizer is loaded before formatting
+            if self._tokenizer is None:
+                raise RuntimeError("Tokenizer not loaded after _load_model()")
+            
+            # Format messages
+            prompt = self._format_messages(chat_ctx)
+            
+            # Tokenize with proper truncation for context window
+            # TinyLlama has 2048 token context window
+            max_input_length = 2048 - self._max_tokens - 50  # Reserve space for generation
+            inputs = self._tokenizer(
+                prompt, 
+                return_tensors="pt", 
+                truncation=True, 
+                max_length=max_input_length
+            )
+            inputs = {k: v.to(self._device) for k, v in inputs.items()}
+            
+            # Stop tokens - according to TinyLlama docs, uses EOS token
+            stop_token_ids = []
+            if self._tokenizer.eos_token_id:
+                stop_token_ids.append(self._tokenizer.eos_token_id)
+            if self._tokenizer.pad_token_id and self._tokenizer.pad_token_id != self._tokenizer.eos_token_id:
+                stop_token_ids.append(self._tokenizer.pad_token_id)
+            
+            # Additional stop sequences for TinyLlama (common chat patterns)
+            # These help prevent model from generating unwanted tokens
+            if hasattr(self._tokenizer, 'encode'):
+                # Add user/system message markers as stop tokens if they exist
+                try:
+                    # TinyLlama uses specific tokens for chat formatting
+                    user_token = self._tokenizer.encode("<|user|>", add_special_tokens=False)
+                    assistant_token = self._tokenizer.encode("<|assistant|>", add_special_tokens=False)
+                    stop_token_ids.extend(user_token)
+                    stop_token_ids.extend(assistant_token)
+                except:
+                    pass  # Skip if tokens don't exist
+            
+            stopping_criteria = StoppingCriteriaList([StopOnTokens(stop_token_ids)])
+            
+            # MAXIMUM SPEED settings - target 5 second total response
+            # Sacrifice quality for speed
             with torch.no_grad():
                 output_ids = self._model.generate(
                     **inputs,
                     max_new_tokens=self._max_tokens,
-                    temperature=self._temperature,
-                    do_sample=True if self._temperature > 0 else False,
-                    top_p=0.9,
+                    temperature=0.5,  # Lower = faster, more deterministic
+                    do_sample=True,
+                    top_p=0.85,  # Lower for faster convergence
+                    top_k=10,  # Very low for MAXIMUM speed (only top 10 tokens)
+                    repetition_penalty=1.2,  # Higher to end quickly
+                    num_beams=1,  # Greedy = fastest
+                    early_stopping=True,
                     stopping_criteria=stopping_criteria,
                     pad_token_id=self._tokenizer.pad_token_id,
+                    eos_token_id=self._tokenizer.eos_token_id,
+                    use_cache=True,  # Enable KV cache for faster generation
                 )
             
             # Decode response
             input_length = inputs["input_ids"].shape[1]
             generated_ids = output_ids[0][input_length:]
-            response_text = self._tokenizer.decode(generated_ids, skip_special_tokens=True)
             
-            # Yield chunks
-            # For streaming-like behavior, yield in chunks
-            chunk_size = 10
-            for i in range(0, len(response_text), chunk_size):
-                chunk_text = response_text[i:i + chunk_size]
-                if chunk_text.strip():
-                    await asyncio.sleep(0)  # Yield control
+            # Decode with skip_special_tokens to remove special tokens
+            # According to docs, this is important for chat models
+            response_text = self._tokenizer.decode(
+                generated_ids, 
+                skip_special_tokens=True,
+                clean_up_tokenization_spaces=True  # Clean up spacing
+            )
+            
+            # Clean up the response (remove any artifacts)
+            response_text = response_text.strip()
+            
+            # Yield chunks FASTER for quicker response
+            # Stream in larger chunks to reduce overhead
+            words = response_text.split()
+            
+            # Stream in larger batches for MAXIMUM speed
+            if words:
+                batch_size = 5  # Send 5 words at a time for fastest delivery
+                for i in range(0, len(words), batch_size):
+                    batch = words[i:i + batch_size]
+                    chunk_text = " ".join(batch) + " "
+                    
+                    # NO delay for maximum speed
+                    # (removed asyncio.sleep for instant streaming)
+                    
                     yield llm.ChatChunk(
-                        choices=[
-                            llm.Choice(
-                                delta=llm.ChatDelta(content=chunk_text),
-                                index=0,
-                            )
-                        ]
+                        id=str(uuid.uuid4()),
+                        delta=ChoiceDelta(content=chunk_text)
                     )
-            
+            else:
+                # Fallback: yield entire response if no words
+                if response_text.strip():
+                    yield llm.ChatChunk(
+                        id=str(uuid.uuid4()),
+                        delta=ChoiceDelta(content=response_text)
+                    )
         except Exception as e:
             print(f"❌ Hugging Face LLM error: {e}")
-            yield llm.ChatChunk(
-                choices=[
-                    llm.Choice(
-                        delta=llm.ChatDelta(content=f"Error: {str(e)}"),
-                        index=0,
-                    )
-                ]
-            )
+            import traceback
+            traceback.print_exc()
+            # Yield error message as final chunk
+            try:
+                yield llm.ChatChunk(
+                    id=str(uuid.uuid4()),
+                    delta=ChoiceDelta(content=f"I apologize, but I encountered an error: {str(e)}")
+                )
+            except Exception as yield_error:
+                # If even yielding fails, log and stop
+                print(f"❌ Failed to yield error chunk: {yield_error}")
+                # Don't re-raise - let it stop gracefully
+                return
+    
+    def chat(
+        self,
+        *,
+        chat_ctx: ChatContext,
+        conn_options: Optional[object] = None,
+        fnc_ctx: Optional[object] = None,
+        tools: Optional[list] = None,
+        tool_choice: Optional[str] = None,
+        **kwargs,  # Catch any other parameters LiveKit might pass
+    ):
+        """Generate chat response - returns async context manager that is also an async iterator"""
+        # Return wrapped async iterator that supports both protocols
+        iterator = self._chat_impl(
+            chat_ctx=chat_ctx,
+            conn_options=conn_options,
+            fnc_ctx=fnc_ctx,
+            tools=tools,
+            tool_choice=tool_choice,
+            **kwargs
+        )
+        return ChatContextManager(iterator)

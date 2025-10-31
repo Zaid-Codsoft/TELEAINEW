@@ -1,0 +1,372 @@
+/* ============================================
+   VOICE CALL - PROFESSIONAL UI
+   ============================================ */
+
+.voice-call-container {
+  display: grid;
+  gap: var(--space-xl);
+}
+
+.voice-call-card {
+  padding: var(--space-2xl);
+}
+
+/* Call Header */
+.call-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-xl);
+  padding-bottom: var(--space-xl);
+  border-bottom: 1px solid var(--neutral-200);
+}
+
+.call-icon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
+  color: white;
+  border-radius: var(--radius-xl);
+  font-size: var(--text-2xl);
+  box-shadow: var(--shadow-md);
+}
+
+.call-title {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: var(--neutral-900);
+  margin: 0 0 var(--space-xs) 0;
+}
+
+.call-description {
+  font-size: var(--text-sm);
+  color: var(--neutral-600);
+  margin: 0;
+}
+
+/* Agent Preview */
+.agent-preview {
+  margin-bottom: var(--space-xl);
+  padding: var(--space-lg);
+  background: var(--neutral-50);
+  border: 1px solid var(--neutral-200);
+  border-radius: var(--radius-xl);
+}
+
+.agent-preview-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.agent-avatar {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
+  color: white;
+  border-radius: var(--radius-full);
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  box-shadow: var(--shadow-sm);
+}
+
+.agent-preview-info h4 {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: var(--neutral-900);
+  margin: 0 0 var(--space-xs) 0;
+}
+
+.agent-details {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-sm);
+}
+
+/* Call Setup State */
+.call-setup {
+  min-height: 400px;
+}
+
+.empty-state-inline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  margin-top: var(--space-lg);
+  background: var(--warning-light);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-lg);
+  color: #92400e;
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.empty-state-inline p {
+  margin: 0;
+  color: #92400e;
+}
+
+/* Connecting State */
+.call-connecting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3xl) var(--space-xl);
+  text-align: center;
+  min-height: 400px;
+}
+
+.connecting-spinner {
+  margin-bottom: var(--space-xl);
+  color: var(--primary-600);
+}
+
+.call-connecting h3 {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: var(--neutral-900);
+  margin-bottom: var(--space-sm);
+}
+
+.call-connecting .text-muted {
+  font-size: var(--text-base);
+}
+
+/* Active Call State */
+.call-active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-2xl) 0;
+  min-height: 500px;
+}
+
+.call-avatar-container {
+  margin-bottom: var(--space-2xl);
+}
+
+.call-avatar-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.call-avatar {
+  width: 140px;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
+  color: white;
+  border-radius: var(--radius-full);
+  font-size: var(--text-5xl);
+  font-weight: var(--font-bold);
+  box-shadow: var(--shadow-xl);
+  transition: all var(--transition-base);
+}
+
+.call-avatar.speaking {
+  animation: avatarPulse 1.5s ease-in-out infinite;
+  box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+}
+
+@keyframes avatarPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 20px rgba(59, 130, 246, 0);
+  }
+}
+
+/* Audio Wave Animation */
+.audio-wave {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: white;
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-lg);
+}
+
+.audio-wave span {
+  display: inline-block;
+  width: 3px;
+  height: 12px;
+  background: var(--primary-600);
+  border-radius: 2px;
+  animation: waveAnimation 1s ease-in-out infinite;
+}
+
+.audio-wave span:nth-child(1) { animation-delay: 0s; }
+.audio-wave span:nth-child(2) { animation-delay: 0.1s; }
+.audio-wave span:nth-child(3) { animation-delay: 0.2s; }
+.audio-wave span:nth-child(4) { animation-delay: 0.3s; }
+
+@keyframes waveAnimation {
+  0%, 100% {
+    height: 12px;
+  }
+  50% {
+    height: 24px;
+  }
+}
+
+/* Call Info */
+.call-info {
+  text-align: center;
+  margin-bottom: var(--space-2xl);
+}
+
+.call-agent-name {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-bold);
+  color: var(--neutral-900);
+  margin-bottom: var(--space-md);
+}
+
+.call-status {
+  display: flex;
+  justify-content: center;
+}
+
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+}
+
+.status-indicator.speaking {
+  background: var(--success-light);
+  color: #065f46;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.status-indicator.listening {
+  background: var(--primary-100);
+  color: var(--primary-700);
+}
+
+/* Call Controls */
+.call-controls {
+  margin-bottom: var(--space-xl);
+}
+
+.call-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--neutral-50);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  color: var(--neutral-600);
+}
+
+/* Tips Card */
+.tips-card {
+  padding: var(--space-xl);
+}
+
+.tips-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--neutral-200);
+}
+
+.tips-header h4 {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: var(--neutral-900);
+  margin: 0;
+}
+
+.tips-header svg {
+  color: var(--primary-600);
+}
+
+.tips-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.tips-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--neutral-50);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-fast);
+}
+
+.tips-list li:hover {
+  background: var(--primary-50);
+}
+
+.tips-list li svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--success);
+}
+
+.tips-list li span {
+  font-size: var(--text-sm);
+  color: var(--neutral-700);
+  line-height: var(--leading-relaxed);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .voice-call-card {
+    padding: var(--space-lg);
+  }
+
+  .call-header {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .call-avatar {
+    width: 100px;
+    height: 100px;
+    font-size: var(--text-4xl);
+  }
+
+  .call-agent-name {
+    font-size: var(--text-2xl);
+  }
+
+  .tips-list li {
+    flex-direction: column;
+    text-align: center;
+  }
+}

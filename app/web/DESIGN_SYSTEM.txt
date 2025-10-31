@@ -1,0 +1,388 @@
+================================================================================
+TELE-AI PLATFORM - FRONTEND DESIGN SYSTEM
+================================================================================
+
+Project: Tele-AI Voice Agent Management System
+Frontend Framework: React 18.2.0
+Design Style: Modern, Professional with Blue Color Scheme
+Created: October 31, 2025
+
+================================================================================
+COLOR PALETTE
+================================================================================
+
+Primary Colors:
+- Primary Blue:      #3b82f6 (Main actions, headers)
+- Primary Dark:      #1e40af (Text, headings)
+- Primary Light:     #93c5fd (Accents)
+
+Secondary Colors:
+- Purple:            #8b5cf6 (Gradients, accents)
+- Success Green:     #10b981 (Active states, success)
+- Warning Orange:    #f59e0b (Warnings, attention)
+- Danger Red:        #ef4444 (Delete, errors)
+
+Neutral Colors:
+- Gray 50-900:       Full grayscale palette
+- White:             #ffffff (Cards, backgrounds)
+
+Gradients:
+- Main Gradient:     135deg, #667eea → #764ba2
+- Blue Gradient:     135deg, #3b82f6 → #2563eb
+- Success Gradient:  135deg, #10b981 → #059669
+- Danger Gradient:   135deg, #ef4444 → #dc2626
+
+================================================================================
+TYPOGRAPHY
+================================================================================
+
+Font Family:
+- Primary: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto
+- Monospace: 'Courier New', Monaco, Consolas
+
+Font Sizes:
+- h1: 2.5rem
+- h2: 2rem
+- h3: 1.75rem
+- h4: 1.5rem
+- h5: 1.25rem
+- h6: 1rem
+- Body: 1rem
+- Small: 0.875rem
+
+Font Weights:
+- Regular: 400
+- Medium: 600
+- Bold: 700
+
+================================================================================
+COMPONENT STRUCTURE
+================================================================================
+
+1. DASHBOARD (Main Landing Page)
+   - Full-screen gradient background
+   - Professional header with logo and user profile
+   - Welcome banner with statistics
+   - Module cards organized by iteration:
+     * Iteration 1: Available (Green badge)
+     * Iteration 2: Coming Soon (Orange badge)
+     * Iteration 3: Planned (Purple badge)
+   - Responsive footer
+
+2. TEST MODULE (Iteration 1 - Active)
+   Contains three sections:
+   a. Voice Call Component
+      - Agent selection dropdown
+      - Start/End call buttons
+      - Real-time status indicators
+      - Speaking/Listening visual feedback
+      - Tips for users
+   
+   b. Sessions List
+      - Table showing recent sessions
+      - Refresh functionality
+      - Status badges (Active/Ended)
+      - Duration tracking
+      - Auto-refresh every 10 seconds
+   
+   c. Agent Manager
+      - Create/Edit/Delete agents
+      - Form for agent configuration
+      - Table with agent details
+      - Active/Inactive status
+
+3. COMING SOON MODULES (Iteration 2 & 3)
+   - Agent Hub
+   - Analytics
+   - Knowledge Base
+   - Workflows
+   - CRM Integration
+   - Webhooks
+   - Permissions
+   
+   These show a "Coming Soon" page with construction icon
+
+================================================================================
+DESIGN PRINCIPLES
+================================================================================
+
+1. MODERN & PROFESSIONAL
+   - Clean layouts with ample whitespace
+   - Consistent border-radius (8px-16px)
+   - Professional color scheme
+   - Subtle animations and transitions
+
+2. RESPONSIVE DESIGN
+   - Mobile-first approach
+   - Breakpoints: 768px, 1024px
+   - Flexible grids and layouts
+   - Touch-friendly buttons
+
+3. USER FEEDBACK
+   - Visual state changes (hover, active, disabled)
+   - Loading spinners
+   - Status indicators
+   - Error/success messages
+   - Real-time updates
+
+4. ACCESSIBILITY
+   - High contrast text
+   - Clear focus states
+   - Semantic HTML
+   - Keyboard navigation support
+
+5. PERFORMANCE
+   - Optimized animations (GPU-accelerated)
+   - Lazy loading where appropriate
+   - Efficient re-renders
+   - Minimal bundle size
+
+================================================================================
+ANIMATIONS & EFFECTS
+================================================================================
+
+Keyframe Animations:
+- fadeIn:      Fade in from bottom (0.5s)
+- slideInRight: Slide in from right (0.3s)
+- pulse:       Scale and shadow pulse (2s infinite)
+- spin:        360° rotation (0.8s infinite)
+- bounce:      Vertical bounce (2s infinite)
+- float:       Gentle float (3s infinite)
+
+Transitions:
+- All interactive elements: 0.3s ease-out
+- Hover effects: translateY(-2px-5px)
+- Shadow enhancements on hover
+- Color transitions
+
+================================================================================
+BUTTON STYLES
+================================================================================
+
+Primary Button:
+- Background: Blue gradient
+- Color: White
+- Shadow: Blue shadow
+- Hover: Darker blue, lift up
+
+Secondary Button:
+- Background: White
+- Color: Blue
+- Border: 2px blue
+- Hover: Blue background, white text
+
+Danger Button:
+- Background: Red gradient
+- Color: White
+- Shadow: Red shadow
+- Hover: Darker red, lift up
+
+Button Sizes:
+- Regular: padding 0.75rem 1.5rem
+- Large: padding 1rem 2rem
+
+================================================================================
+CARD STYLES
+================================================================================
+
+All Cards:
+- Background: White
+- Border-radius: 16px
+- Padding: 2rem
+- Shadow: 0 10px 30px rgba(0,0,0,0.1)
+- Hover: Enhanced shadow
+
+Card Variants:
+- Info Card: Blue left border
+- Success Card: Green background
+- Error Card: Red background with left border
+- Warning Card: Orange background
+
+================================================================================
+TABLE STYLES
+================================================================================
+
+Headers:
+- Background: Blue gradient
+- Color: White
+- Text: Uppercase, bold, small letter-spacing
+
+Rows:
+- Border-bottom: Light gray
+- Hover: Light background, subtle scale
+
+Cells:
+- Padding: 1rem
+- Color: Dark gray
+
+================================================================================
+BADGE STYLES
+================================================================================
+
+Status Badges:
+- Active: Green gradient
+- Ended/Inactive: Gray gradient
+- Warning: Orange gradient
+- Error: Red gradient
+
+Badge Style:
+- Border-radius: 50px (pill-shaped)
+- Padding: 0.375rem 0.875rem
+- Font: Bold, uppercase, small
+- Letter-spacing: 0.5px
+
+================================================================================
+FORM STYLES
+================================================================================
+
+Input Fields:
+- Border: 2px solid light gray
+- Border-radius: 8px
+- Padding: 1rem
+- Focus: Blue border + shadow ring
+- Disabled: Gray background
+
+Textareas:
+- Min-height: 100px-120px
+- Resize: Vertical only
+
+Labels:
+- Font-weight: Bold
+- Margin-bottom: 0.75rem
+- Color: Dark gray
+
+================================================================================
+LAYOUT SYSTEM
+================================================================================
+
+Grid System:
+- Dashboard: repeat(auto-fill, minmax(300px, 1fr))
+- Test Module: 2 columns (responsive to 1)
+- Max-width: 1400px
+- Gap: 1.5rem-2rem
+
+Spacing Scale:
+- 0.5rem (gap-1, mt-1, mb-1)
+- 1rem (gap-2, mt-2, mb-2)
+- 1.5rem (gap-3, mt-3, mb-3)
+- 2rem (gap-4, mt-4, mb-4)
+
+================================================================================
+ITERATION ROADMAP
+================================================================================
+
+ITERATION 1 (CURRENT - ACTIVE):
+✓ Test Module
+  - Voice Call functionality
+  - Sessions tracking
+  - Agent management
+  - Basic CRUD operations
+
+ITERATION 2 (COMING SOON):
+⏳ Agent Hub (Advanced management)
+⏳ Analytics (Performance insights)
+⏳ Knowledge Base (AI training data)
+
+ITERATION 3 (PLANNED):
+📋 Workflows (Automation)
+📋 CRM Integration
+📋 Webhooks
+📋 Permissions & Access Control
+
+================================================================================
+TECHNICAL SPECIFICATIONS
+================================================================================
+
+File Structure:
+app/web/src/
+├── components/
+│   ├── Dashboard.js + Dashboard.css
+│   ├── VoiceCall.js + VoiceCall.css
+│   ├── SessionsList.js + SessionsList.css
+│   └── AgentManager.js + AgentManager.css
+├── App.js + App.css
+├── index.js + index.css
+└── api.js
+
+Dependencies:
+- React 18.2.0
+- React Router DOM 6.20.0
+- LiveKit Client 2.15.5
+- Axios 1.7.0
+
+Build Commands:
+- npm start          (Development server)
+- npm run build      (Production build)
+- npm test           (Run tests)
+
+================================================================================
+VOICE AGENT MODELS (DO NOT MODIFY)
+================================================================================
+
+STRICT INSTRUCTION: Voice-related files should NOT be touched.
+
+Current Models:
+- LLM: TinyLlama-1.1B-Chat-v1.0 (Local Hugging Face)
+- STT: Whisper (Speech-to-Text)
+- TTS: SpeechT5 (Text-to-Speech)
+
+Files to AVOID:
+- app/agent/hf_llm.py
+- app/agent/hf_stt.py
+- app/agent/hf_tts.py
+- app/agent/simple_agent.py
+- app/agent/download_models.py
+
+================================================================================
+USAGE INSTRUCTIONS
+================================================================================
+
+Starting the Frontend:
+1. cd app/web
+2. npm install (if first time)
+3. npm start
+4. Open http://localhost:3000
+
+The dashboard will load showing:
+- Iteration 1 modules (clickable, active)
+- Iteration 2 modules (coming soon)
+- Iteration 3 modules (planned)
+
+Click on "Test Module" to access:
+- Voice call testing
+- Session monitoring
+- Agent management
+
+================================================================================
+FUTURE ENHANCEMENTS
+================================================================================
+
+Planned Features:
+- Dark mode toggle
+- User authentication UI
+- Advanced analytics charts
+- Real-time notifications
+- Multi-language support
+- Enhanced accessibility
+- Progressive Web App (PWA)
+- Mobile responsive improvements
+
+================================================================================
+CONTACT & SUPPORT
+================================================================================
+
+Project: Tele-AI Platform
+Type: FYP (Final Year Project) F25-351-D
+Institution: University
+Year: 2025
+
+For issues or questions:
+- Check console logs for errors
+- Verify backend is running on port 8000
+- Ensure LiveKit server is active
+- Check browser console for frontend errors
+
+================================================================================
+END OF DESIGN SYSTEM DOCUMENTATION
+================================================================================
+

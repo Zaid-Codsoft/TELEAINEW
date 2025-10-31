@@ -1,0 +1,314 @@
+/* ============================================
+   AGENT MANAGER - PROFESSIONAL FORMS & CARDS
+   ============================================ */
+
+.agent-manager-container {
+  height: 100%;
+}
+
+.agent-manager-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.agent-manager-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-xl);
+  border-bottom: 1px solid var(--neutral-200);
+  flex-wrap: wrap;
+}
+
+.agent-manager-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.agent-manager-title svg {
+  color: #60a5fa;
+}
+
+.agent-manager-title h3 {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: white;
+  margin: 0 0 var(--space-xs) 0;
+  text-shadow: 0 2px 10px rgba(59, 130, 246, 0.5);
+}
+
+.agent-manager-title p {
+  font-size: var(--text-sm);
+  margin: 0;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Agent Form Overlay */
+.agent-form-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl);
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Agent Form */
+.agent-form-container {
+  max-width: 800px;
+  width: 100%;
+}
+
+.agent-form {
+  background: rgba(30, 58, 138, 0.95);
+  border: 1px solid rgba(59, 130, 246, 0.5);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-xl);
+  padding-bottom: var(--space-lg);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.form-header h4 {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: white;
+  margin: 0;
+  text-shadow: 0 2px 10px rgba(59, 130, 246, 0.5);
+}
+
+.form-actions {
+  display: flex;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+}
+
+/* Agents Grid */
+.agents-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-xl);
+  padding: var(--space-xl);
+}
+
+/* Agent Card */
+.agent-card {
+  background: rgba(30, 58, 138, 0.6);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  transition: transform 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  will-change: transform;
+}
+
+.agent-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(59, 130, 246, 0.6);
+}
+
+.agent-card-header {
+  position: relative;
+  padding: var(--space-xl);
+  background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.agent-card-avatar {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  color: var(--primary-600);
+  border-radius: var(--radius-full);
+  font-size: var(--text-3xl);
+  font-weight: var(--font-bold);
+  box-shadow: var(--shadow-lg);
+}
+
+.agent-card-status {
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+}
+
+.status-dot {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-full);
+  border: 2px solid white;
+  box-shadow: var(--shadow-md);
+}
+
+.status-dot.active {
+  background: var(--success);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.status-dot.inactive {
+  background: var(--neutral-400);
+}
+
+.agent-card-body {
+  padding: var(--space-xl);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.agent-card-name {
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  color: white;
+  margin: 0;
+  text-align: center;
+  text-shadow: 0 2px 10px rgba(59, 130, 246, 0.5);
+}
+
+.agent-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-xs);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.meta-item svg {
+  color: rgba(96, 165, 250, 0.7);
+}
+
+.agent-card-prompt {
+  font-size: var(--text-sm);
+  color: rgba(255, 255, 255, 0.8);
+  line-height: var(--leading-relaxed);
+  padding: var(--space-md);
+  background: rgba(30, 58, 138, 0.3);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  flex: 1;
+}
+
+.agent-card-badge {
+  display: flex;
+  justify-content: center;
+}
+
+.agent-card-actions {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-xl);
+  border-top: 1px solid rgba(59, 130, 246, 0.3);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.agent-card-actions .btn {
+  flex: 1;
+}
+
+/* Empty State */
+.empty-state {
+  padding: var(--space-3xl) var(--space-xl);
+  text-align: center;
+}
+
+.empty-state-icon {
+  font-size: 5rem;
+  color: rgba(96, 165, 250, 0.3);
+  margin-bottom: var(--space-lg);
+}
+
+.empty-state-title {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: white;
+  margin-bottom: var(--space-sm);
+  text-shadow: 0 2px 10px rgba(59, 130, 246, 0.5);
+}
+
+.empty-state-description {
+  font-size: var(--text-base);
+  color: rgba(255, 255, 255, 0.8);
+  max-width: 500px;
+  margin: 0 auto;
+  line-height: var(--leading-relaxed);
+}
+
+/* Loading State */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3xl);
+  gap: var(--space-md);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .agents-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .agent-manager-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .agent-manager-title {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .agents-grid {
+    grid-template-columns: 1fr;
+    padding: var(--space-lg);
+  }
+
+  .agent-form {
+    padding: var(--space-lg);
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .form-actions .btn {
+    width: 100%;
+  }
+
+  .agent-card-actions {
+    flex-direction: column;
+  }
+}

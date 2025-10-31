@@ -22,6 +22,7 @@ class SpeechT5TTSPlugin(tts.TTS):
         vocoder: str = "microsoft/speecht5_hifigan",
         speaker_embedding: Optional[str] = None,
         device: Optional[str] = None,
+        speed: float = 1.0,  # Speech speed: 1.0 = normal, <1.0 = slower, >1.0 = faster
     ):
         """
         Initialize SpeechT5 TTS
@@ -31,12 +32,17 @@ class SpeechT5TTSPlugin(tts.TTS):
             vocoder: Vocoder model name (converts features to audio)
             speaker_embedding: Pre-computed speaker embedding or dataset name
             device: Device to run on ("cpu", "cuda"). Auto-detected if None
+            speed: Speech speed multiplier (1.0 = normal, 0.8 = 20% slower, 1.2 = 20% faster)
         """
-        super().__init__(
-            sample_rate=16000,  # SpeechT5 default sample rate
-            num_channels=1,
-        )
+        self._sample_rate = 16000  # SpeechT5 default sample rate
+        self._num_channels = 1
+        self._speed = max(0.5, min(2.0, speed))  # Clamp speed between 0.5x and 2.0x
         
+        super().__init__(
+            capabilities=tts.TTSCapabilities(streaming=False),  # Non-streaming for simplicity
+            sample_rate=self._sample_rate,
+            num_channels=self._num_channels,
+        )
         self._model_name = model
         self._vocoder_name = vocoder
         self._speaker_embedding = speaker_embedding
@@ -68,31 +74,63 @@ class SpeechT5TTSPlugin(tts.TTS):
                         self._vocoder = self._vocoder.to(self._device)
                         
                         # Get speaker embedding (default English female voice)
-                        if self._speaker_embedding:
-                            # Use provided embedding
-                            if isinstance(self._speaker_embedding, str):
-                                # Try to load from dataset
-                                embeddings_dataset = load_dataset(
-                                    "Matthijs/cmu-arctic-xvectors",
-                                    split="validation"
-                                )
-                                self._speaker_emb = torch.tensor(
-                                    embeddings_dataset[7306]["xvector"]
-                                ).unsqueeze(0).to(self._device)
+                        # According to SpeechT5 docs, speaker embeddings control voice characteristics
+                        speaker_emb_dim = 512  # SpeechT5 speaker embedding dimension
+                        self._speaker_emb = None
+                        
+                        try:
+                            if self._speaker_embedding:
+                                # Use provided embedding
+                                if isinstance(self._speaker_embedding, str):
+                                    # Try to load from dataset
+                                    print(f"   Loading speaker embeddings from dataset...")
+                                    try:
+                                        embeddings_dataset = load_dataset(
+                                            "Matthijs/cmu-arctic-xvectors",
+                                            split="validation"
+                                        )
+                                        # Default: English female voice (index 7306)
+                                        self._speaker_emb = torch.tensor(
+                                            embeddings_dataset[7306]["xvector"]
+                                        ).unsqueeze(0).to(self._device)
+                                        print(f"   ✅ Loaded speaker embedding from dataset")
+                                    except Exception as dataset_error:
+                                        # Fallback: Use zero embedding (verified to work in test)
+                                        print(f"   ⚠️  Dataset loading failed: {dataset_error}")
+                                        print(f"   Using zero embedding (verified to work)")
+                                        self._speaker_emb = torch.zeros(1, speaker_emb_dim).to(self._device)
+                                else:
+                                    # Pre-computed embedding provided
+                                    self._speaker_emb = torch.tensor(
+                                        self._speaker_embedding
+                                    ).unsqueeze(0).to(self._device)
                             else:
-                                self._speaker_emb = torch.tensor(
-                                    self._speaker_embedding
-                                ).unsqueeze(0).to(self._device)
-                        else:
-                            # Use default speaker embedding
-                            embeddings_dataset = load_dataset(
-                                "Matthijs/cmu-arctic-xvectors",
-                                split="validation"
-                            )
-                            # Default: English female voice (index 7306)
-                            self._speaker_emb = torch.tensor(
-                                embeddings_dataset[7306]["xvector"]
-                            ).unsqueeze(0).to(self._device)
+                                # Use default speaker embedding from dataset
+                                print(f"   Loading default speaker embedding...")
+                                try:
+                                    embeddings_dataset = load_dataset(
+                                        "Matthijs/cmu-arctic-xvectors",
+                                        split="validation"
+                                    )
+                                    # Default: English female voice (index 7306)
+                                    self._speaker_emb = torch.tensor(
+                                        embeddings_dataset[7306]["xvector"]
+                                    ).unsqueeze(0).to(self._device)
+                                    print(f"   ✅ Loaded default speaker embedding")
+                                except Exception as dataset_error:
+                                    # Fallback: Use zero embedding (verified to work in test)
+                                    print(f"   ⚠️  Warning: Could not load speaker embeddings ({dataset_error})")
+                                    print(f"   Using zero embedding (verified to work)")
+                                    self._speaker_emb = torch.zeros(1, speaker_emb_dim).to(self._device)
+                        except Exception as emb_error:
+                            # Final fallback: Use zero embedding (tested and works)
+                            print(f"   ⚠️  Final fallback: Using zero embedding")
+                            self._speaker_emb = torch.zeros(1, speaker_emb_dim).to(self._device)
+                        
+                        if self._speaker_emb is None:
+                            # Safety check: ensure we have an embedding
+                            print(f"   ⚠️  Creating default embedding")
+                            self._speaker_emb = torch.zeros(1, speaker_emb_dim).to(self._device)
                         
                         self._model.eval()
                         self._vocoder.eval()
@@ -104,135 +142,108 @@ class SpeechT5TTSPlugin(tts.TTS):
                         traceback.print_exc()
                         raise
     
-    async def synthesize(self, text: str, fnc_ctx: Optional[object] = None) -> "tts.SynthesizeStream":
-        """Synthesize speech from text"""
-        await self._load_model()
+    def synthesize(self, text: str, *, conn_options: Optional[object] = None) -> "tts.ChunkedStream":
+        """Synthesize speech from text - non-async method that returns a stream"""
+        # Return a stream that will handle the synthesis
+        from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS
+        conn_options = conn_options or DEFAULT_API_CONNECT_OPTIONS
         
-        # Create a stream
-        stream = SpeechT5TTSStream(
-            self._processor,
-            self._model,
-            self._vocoder,
-            self._speaker_emb,
-            text,
-            self.sample_rate,
-            self._device,
+        return SpeechT5TTSStream(
+            tts=self,
+            input_text=text,
+            conn_options=conn_options,
         )
-        
-        return stream
 
 
-class SpeechT5TTSStream(tts.SynthesizeStream):
-    """Stream for SpeechT5 TTS synthesis"""
+class SpeechT5TTSStream(tts.ChunkedStream):
+    """Stream for SpeechT5 TTS synthesis - implements the ChunkedStream interface"""
     
     def __init__(
         self,
-        processor: SpeechT5Processor,
-        model: SpeechT5ForTextToSpeech,
-        vocoder: SpeechT5HifiGan,
-        speaker_emb: torch.Tensor,
-        text: str,
-        sample_rate: int,
-        device: str,
+        *,
+        tts: "SpeechT5TTSPlugin",
+        input_text: str,
+        conn_options: object,
     ):
-        super().__init__()
-        self._processor = processor
-        self._model = model
-        self._vocoder = vocoder
-        self._speaker_emb = speaker_emb
-        self._text = text
-        self._sample_rate = sample_rate
-        self._device = device
-        self._synthesized = False
+        super().__init__(tts=tts, input_text=input_text, conn_options=conn_options)
+        self._tts_plugin = tts
     
-    async def __aiter__(self) -> AsyncIterator[rtc.AudioFrame]:
-        """Generate audio frames"""
-        if self._synthesized:
-            return
-        
-        self._synthesized = True
-        
+    async def _run(self, output_emitter: "tts.AudioEmitter") -> None:
+        """
+        Implement the actual synthesis logic.
+        This is called by the ChunkedStream base class.
+        """
         try:
-            # Run TTS in a thread to avoid blocking
+            # Load the model (lazy loading)
+            await self._tts_plugin._load_model()
+            
+            # Initialize the output emitter with audio format
+            output_emitter.initialize(
+                request_id=f"speecht5-{id(self)}",
+                sample_rate=self._tts_plugin._sample_rate,
+                num_channels=self._tts_plugin._num_channels,
+                mime_type="audio/pcm",
+            )
+            
             loop = asyncio.get_event_loop()
             
             # Preprocess text
             inputs = await loop.run_in_executor(
                 None,
-                self._processor,
-                text=self._text,
-                return_tensors="pt",
+                lambda: self._tts_plugin._processor(
+                    text=self._input_text,
+                    return_tensors="pt",
+                )
             )
-            inputs = {k: v.to(self._device) for k, v in inputs.items()}
+            
+            # Move inputs to device
+            inputs_device = {k: v.to(self._tts_plugin._device) for k, v in inputs.items()}
             
             # Generate speech
             with torch.no_grad():
-                # Generate speech features
-                speech = await loop.run_in_executor(
-                    None,
-                    lambda: self._model.generate_speech(
-                        inputs["input_ids"],
-                        self._speaker_emb,
-                        vocoder=self._vocoder,
+                def generate():
+                    return self._tts_plugin._model.generate_speech(
+                        inputs_device["input_ids"],
+                        self._tts_plugin._speaker_emb,
+                        vocoder=self._tts_plugin._vocoder,
                     )
-                )
+                
+                speech = await loop.run_in_executor(None, generate)
             
             # Convert to numpy
             audio_data = speech.cpu().numpy().astype(np.float32)
             
+            # Flatten if needed
+            if len(audio_data.shape) > 1:
+                audio_data = audio_data.flatten()
+            
+            # Apply speed adjustment by resampling if needed
+            if abs(self._tts_plugin._speed - 1.0) > 0.01:  # Apply only if speed is different from 1.0
+                # Speed adjustment: resample to change playback speed
+                # Speed > 1.0: faster (fewer samples)
+                # Speed < 1.0: slower (more samples)
+                import scipy.signal
+                num_samples = int(len(audio_data) / self._tts_plugin._speed)
+                audio_data = scipy.signal.resample(audio_data, num_samples)
+            
             # Normalize to [-1.0, 1.0] range
             max_val = np.abs(audio_data).max()
-            if max_val > 1.0:
-                audio_data = audio_data / max_val
+            if max_val > 0.0:
+                audio_data = audio_data / max(1.0, max_val)
             
-            # Ensure sample rate matches
-            actual_sr = self._sample_rate
-            if actual_sr != self._sample_rate:
-                # Resample if needed
-                from scipy import signal
-                num_samples = int(len(audio_data) * self._sample_rate / actual_sr)
-                audio_data = signal.resample(audio_data, num_samples)
-            
-            # Convert to int16
+            # Convert to int16 for LiveKit (range: -32768 to 32767)
             audio_data = (audio_data * 32767.0).astype(np.int16)
             
-            # Split into chunks for streaming
-            chunk_size = int(self._sample_rate * 0.1)  # 100ms chunks
+            # Push audio data to output emitter as bytes
+            # LiveKit's AudioEmitter expects bytes, not numpy arrays
+            audio_bytes = audio_data.tobytes()
+            output_emitter.push(audio_bytes)
             
-            for i in range(0, len(audio_data), chunk_size):
-                chunk = audio_data[i:i + chunk_size]
-                
-                # Ensure chunk is the right size (pad if necessary)
-                if len(chunk) < chunk_size:
-                    padded_chunk = np.zeros(chunk_size, dtype=np.int16)
-                    padded_chunk[:len(chunk)] = chunk
-                    chunk = padded_chunk
-                
-                # Create audio frame
-                audio_frame = rtc.AudioFrame(
-                    data=chunk.reshape(1, -1).tobytes(),
-                    sample_rate=self._sample_rate,
-                    num_channels=1,
-                    samples_per_channel=len(chunk),
-                )
-                
-                yield audio_frame
-                
-                # Small delay to simulate real-time streaming
-                await asyncio.sleep(0.05)
-                
         except Exception as e:
             print(f"❌ TTS synthesis error: {e}")
             import traceback
             traceback.print_exc()
-            # Return empty frame on error
-            empty_frame = rtc.AudioFrame(
-                data=np.zeros(self._sample_rate // 10, dtype=np.int16).tobytes(),
-                sample_rate=self._sample_rate,
-                num_channels=1,
-                samples_per_channel=self._sample_rate // 10,
-            )
-            yield empty_frame
+            raise  # Let the ChunkedStream base class handle the error
 
 # Alias for backward compatibility
 CoquiTTSPlugin = SpeechT5TTSPlugin

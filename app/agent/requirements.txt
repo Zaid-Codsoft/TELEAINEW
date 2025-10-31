@@ -4,16 +4,13 @@ livekit-plugins-silero
 python-dotenv
 aiohttp
 
-# Hugging Face and ML dependencies (for STT/TTS)
+# Hugging Face and ML dependencies (for STT/TTS/LLM)
 transformers
 torch
 torchaudio
 accelerate
 sentencepiece
 protobuf
-
-# Google Gemini
-google-generativeai
 
 # For TTS (Text-to-Speech) - Using transformers + speecht5
 soundfile

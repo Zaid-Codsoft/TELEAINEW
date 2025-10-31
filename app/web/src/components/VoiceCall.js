@@ -1,10 +1,11 @@
-/**
- * Voice Call Component
- * Allows users to start a voice call with an agent
- */
 import React, { useState, useEffect, useRef } from 'react';
 import { Room, RoomEvent } from 'livekit-client';
 import { apiClient } from '../api';
+import './VoiceCall.css';
+import { 
+  FiPhone, FiPhoneOff, FiMic, FiMicOff, FiVolume2, 
+  FiVolumeX, FiAlertCircle, FiCheckCircle, FiLoader 
+} from 'react-icons/fi';
 
 function VoiceCall() {
   const [agents, setAgents] = useState([]);
@@ -13,6 +14,8 @@ function VoiceCall() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [error, setError] = useState(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [agentSpeaking, setAgentSpeaking] = useState(false);
   
   const roomRef = useRef(null);
   const audioRef = useRef(null);
@@ -20,7 +23,6 @@ function VoiceCall() {
   useEffect(() => {
     loadAgents();
     
-    // Cleanup on unmount
     return () => {
       if (roomRef.current) {
         roomRef.current.disconnect();
@@ -52,13 +54,11 @@ function VoiceCall() {
     setError(null);
 
     try {
-      // Create session
       const sessionResponse = await apiClient.createSession(selectedAgentId, 'web');
       const { session_id, room: roomName, url, token } = sessionResponse.data;
       
       setSessionId(session_id);
 
-      // Connect to LiveKit room
       const room = new Room({
         adaptiveStream: true,
         dynacast: true,
@@ -66,13 +66,28 @@ function VoiceCall() {
 
       roomRef.current = room;
 
-      // Set up event handlers
       room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+        console.log('🔊 Track subscribed:', track.kind);
         if (track.kind === 'audio') {
           const audioElement = track.attach();
           audioRef.current = audioElement;
           document.body.appendChild(audioElement);
-          audioElement.play();
+          
+          audioElement.addEventListener('play', () => {
+            setAgentSpeaking(true);
+          });
+          
+          audioElement.addEventListener('ended', () => {
+            setAgentSpeaking(false);
+          });
+          
+          audioElement.addEventListener('pause', () => {
+            setAgentSpeaking(false);
+          });
+          
+          audioElement.play().catch(err => {
+            console.error('❌ Error playing audio:', err);
+          });
         }
       });
 
@@ -84,12 +99,19 @@ function VoiceCall() {
         }
       });
 
-      // Connect to room
       await room.connect(url, token);
+      
+      try {
+        await room.localParticipant.setMicrophoneEnabled(true);
+        console.log('✅ Microphone enabled');
+      } catch (micError) {
+        console.error('❌ Microphone error:', micError);
+        setError('Failed to enable microphone. Please grant permission.');
+        throw micError;
+      }
+      
       setIsConnected(true);
       setIsConnecting(false);
-
-      console.log('✓ Connected to room:', room.name);
 
     } catch (error) {
       console.error('Failed to start call:', error);
@@ -125,27 +147,33 @@ function VoiceCall() {
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
 
   return (
-    <div>
-      <div className="card">
-        <h2>Voice Call</h2>
-
+    <div className="voice-call-container">
+      <div className="voice-call-card card">
+        {/* Error Alert */}
         {error && (
-          <div style={{
-            padding: '1rem',
-            background: '#fee2e2',
-            color: '#991b1b',
-            borderRadius: '0.5rem',
-            marginBottom: '1.5rem'
-          }}>
-            {error}
+          <div className="alert alert-error">
+            <FiAlertCircle size={20} />
+            <span>{error}</span>
           </div>
         )}
 
+        {/* Not Connected State */}
         {!isConnected && !isConnecting && (
-          <div>
+          <div className="call-setup animate-fade-in">
+            <div className="call-header">
+              <div className="call-icon">
+                <FiPhone />
+              </div>
+              <div>
+                <h3 className="call-title">Voice Call Test</h3>
+                <p className="call-description">Start a voice conversation with an AI agent</p>
+              </div>
+            </div>
+
             <div className="form-group">
-              <label>Select Agent</label>
+              <label className="form-label required">Select Agent</label>
               <select
+                className="form-select"
                 value={selectedAgentId}
                 onChange={(e) => setSelectedAgentId(e.target.value)}
                 disabled={agents.length === 0}
@@ -162,105 +190,130 @@ function VoiceCall() {
             </div>
 
             {selectedAgent && (
-              <div style={{
-                padding: '1rem',
-                background: '#f9fafb',
-                borderRadius: '0.5rem',
-                marginBottom: '1.5rem'
-              }}>
-                <h3 style={{ marginTop: 0, marginBottom: '0.5rem', fontSize: '1.125rem' }}>
-                  {selectedAgent.name}
-                </h3>
-                <p style={{ color: '#6b7280', margin: 0, fontSize: '0.875rem' }}>
-                  Model: {selectedAgent.llm_model} | Locale: {selectedAgent.locale}
-                </p>
+              <div className="agent-preview">
+                <div className="agent-preview-header">
+                  <div className="agent-avatar">
+                    {selectedAgent.name.charAt(0)}
+                  </div>
+                  <div className="agent-preview-info">
+                    <h4>{selectedAgent.name}</h4>
+                    <div className="agent-details">
+                      <span className="text-muted">{selectedAgent.locale}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
             <button
-              className="btn btn-primary btn-large"
+              className="btn btn-primary btn-xl"
               onClick={startCall}
               disabled={agents.length === 0}
               style={{ width: '100%' }}
             >
-              🎤 Start Voice Call
+              <FiPhone /> Start Voice Call
             </button>
 
             {agents.length === 0 && (
-              <p style={{ textAlign: 'center', color: '#6b7280', marginTop: '1rem' }}>
-                No active agents available. Please create an agent first.
-              </p>
+              <div className="empty-state-inline">
+                <FiAlertCircle />
+                <p>No active agents available. Please create an agent first.</p>
+              </div>
             )}
           </div>
         )}
 
+        {/* Connecting State */}
         {isConnecting && (
-          <div style={{ textAlign: 'center', padding: '3rem' }}>
-            <div className="loading-spinner" style={{ margin: '0 auto 1rem' }}></div>
-            <p>Connecting to agent...</p>
+          <div className="call-connecting animate-scale-in">
+            <div className="connecting-spinner">
+              <FiLoader className="animate-spin" size={48} />
+            </div>
+            <h3>Connecting to agent...</h3>
+            <p className="text-muted">Establishing voice connection</p>
           </div>
         )}
 
+        {/* Connected State */}
         {isConnected && (
-          <div style={{ textAlign: 'center', padding: '3rem' }}>
-            <div style={{
-              width: '120px',
-              height: '120px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              margin: '0 auto 2rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '3rem',
-              animation: 'pulse 2s ease-in-out infinite'
-            }}>
-              🎤
+          <div className="call-active animate-scale-in">
+            <div className="call-avatar-container">
+              <div className="call-avatar-wrapper">
+                <div className={`call-avatar ${agentSpeaking ? 'speaking' : ''}`}>
+                  {selectedAgent?.name.charAt(0)}
+                </div>
+                {agentSpeaking && (
+                  <div className="audio-wave">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                )}
+              </div>
             </div>
             
-            <h3 style={{ marginBottom: '0.5rem' }}>
-              Connected to {selectedAgent?.name}
-            </h3>
-            <p style={{ color: '#6b7280', marginBottom: '2rem' }}>
-              Start speaking...
-            </p>
+            <div className="call-info">
+              <h3 className="call-agent-name">{selectedAgent?.name}</h3>
+              <div className="call-status">
+                {agentSpeaking ? (
+                  <div className="status-indicator speaking">
+                    <FiVolume2 />
+                    <span>Agent is speaking...</span>
+                  </div>
+                ) : (
+                  <div className="status-indicator listening">
+                    <FiMic />
+                    <span>Listening... Speak now</span>
+                  </div>
+                )}
+              </div>
+            </div>
 
-            <button
-              className="btn btn-secondary btn-large"
-              onClick={endCall}
-              style={{ background: '#ef4444' }}
-            >
-              📞 End Call
-            </button>
+            <div className="call-controls">
+              <button
+                className="btn btn-danger btn-lg"
+                onClick={endCall}
+              >
+                <FiPhoneOff /> End Call
+              </button>
+            </div>
+
+            <div className="call-note">
+              <FiAlertCircle size={16} />
+              <span>Check the terminal for real-time transcriptions</span>
+            </div>
           </div>
         )}
       </div>
 
-      <div className="card" style={{ marginTop: '2rem' }}>
-        <h3>Tips for a Great Call</h3>
-        <ul style={{ color: '#6b7280', lineHeight: '1.8' }}>
-          <li>Make sure your microphone is enabled and working</li>
-          <li>Use headphones to avoid echo</li>
-          <li>Speak clearly and wait for the agent to finish speaking</li>
-          <li>Try asking the agent to check the weather or perform calculations</li>
+      {/* Tips Card */}
+      <div className="tips-card card">
+        <div className="tips-header">
+          <FiCheckCircle size={20} />
+          <h4>Call Tips</h4>
+        </div>
+        <ul className="tips-list">
+          <li>
+            <FiCheckCircle />
+            <span>Ensure your microphone is enabled and working properly</span>
+          </li>
+          <li>
+            <FiCheckCircle />
+            <span>Use headphones to prevent echo and improve audio quality</span>
+          </li>
+          <li>
+            <FiCheckCircle />
+            <span>Speak clearly and wait for the agent to finish responding</span>
+          </li>
+          <li>
+            <FiCheckCircle />
+            <span>Try asking questions or giving simple commands</span>
+          </li>
         </ul>
       </div>
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% {
-            transform: scale(1);
-            box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7);
-          }
-          50% {
-            transform: scale(1.05);
-            box-shadow: 0 0 0 10px rgba(102, 126, 234, 0);
-          }
-        }
-      `}</style>
     </div>
   );
 }
 
 export default VoiceCall;
-
